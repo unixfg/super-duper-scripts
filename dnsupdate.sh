@@ -30,6 +30,7 @@ curl -D- -X PUT -H "Content-Type: application/json" \
         $CURRENT_ZONE_HREF/$SUBDOMAIN/A
 
 elif [[ "$MY_IP" == "$GOOG" ]]
+then
  echo 'No Change'
  exit 0
 else

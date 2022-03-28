@@ -1,0 +1,40 @@
+! 2022-01-15 https://ubuntu.com
+ubuntu.com##.p-modal__dialog
+ubuntu.com##.p-modal
+
+! 2022-01-21 https://www.razer.com
+www.razer.com##.cookies-container
+
+! 2022-01-21 https://www.newegg.com
+www.newegg.com##.has-icon.speech-box
+
+! 2022-01-24 https://www.glassdoor.com
+www.glassdoor.com##.e91w1dn3.css-6ile9a.gdGrid
+
+! 2022-01-29 https://www.prusa3d.com
+www.prusa3d.com##.ot-fade-in.onetrust-pc-dark-filter
+www.prusa3d.com###onetrust-button-group-parent
+www.prusa3d.com###onetrust-group-container
+
+! 2022-01-30 https://serverfault.com
+serverfault.com##.js-dismissable-hero.ps-relative.sm\:pb24.sm\:pt24.fc-black-200.bg-black-750.py24
+
+! 2022-02-25 https://www.ft.com
+www.ft.com##.o-cookie-message__inner
+
+! 2022-03-01 https://www.cam.ac.uk
+www.cam.ac.uk##.eu-cookie-compliance-banner--categories.eu-cookie-compliance-banner-info.eu-cookie-compliance-banner
+
+! 2022-03-01 https://spectrum.ieee.org
+spectrum.ieee.org##.gdpr-cookie-wrapper
+
+! 2022-03-27 https://timeular.com
+timeular.com##.banner__content
+timeular.com##.banner__overlay
+
+! 2022-03-27 https://my.vultr.com
+my.vultr.com##.info_message.account-banner
+my.vultr.com##.is-open.sticky-cta
+
+! 2022-03-28 https://reateknives.com
+reateknives.com##.js-loader.loaderOverlay

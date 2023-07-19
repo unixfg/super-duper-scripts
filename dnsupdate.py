@@ -42,9 +42,9 @@ def main():
         else:
             print(f'Failed to update DNS record of {SUBDOMAIN}.{DOMAIN}')
     elif current_ip == existing_ip:
-        print('No Change')
+        pass
     else:
-        print('What?')
+        print('Unknown error')
 
 if __name__ == "__main__":
     main()

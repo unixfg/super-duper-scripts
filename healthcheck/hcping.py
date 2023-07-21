@@ -7,15 +7,9 @@ import time
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Disk check and http ping utility')
-parser.add_argument('--help', action='store_true', help='Prints this help text')
 parser.add_argument('--verbose', action='store_true', help='Prints verbose output')
 parser.add_argument('--silent', action='store_true', help='Suppresses all output')
 args = parser.parse_args()
-
-# Check for --help flag
-if args.help:
-    parser.print_help()
-    exit(0)
 
 # Read config file
 config = configparser.ConfigParser()

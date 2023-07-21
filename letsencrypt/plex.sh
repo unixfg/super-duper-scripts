@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # File paths
 PFX_PATH="/var/lib/plexmediaserver/letsencrypt.pfx"

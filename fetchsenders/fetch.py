@@ -13,6 +13,7 @@ config.read(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.ini
 username = config.get('credentials', 'username')
 password = config.get('credentials', 'password')
 server = config.get('credentials', 'server')
+output_file = config.get('settings', 'output', fallback='output.txt') # Fallback to 'output.txt' if no value is provided
 
 # establish a connection
 mail = imaplib.IMAP4_SSL(server)
@@ -45,6 +46,10 @@ for uid in tqdm(uid_list, desc='Processing emails', unit='email'):
 # unique senders
 unique_senders = list(set(senders))
 
-# print each sender
-for sender in unique_senders:
-    print(sender)
+# write each sender to the output file
+output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), output_file)
+with open(output_path, 'w') as f:
+    for sender in unique_senders:
+        f.write(sender + '\n')
+
+print(f'Unique senders saved to {output_path}')

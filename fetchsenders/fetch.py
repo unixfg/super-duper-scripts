@@ -50,8 +50,10 @@ for uid in tqdm(uid_list, desc='Processing emails', unit='email', disable=args.s
     from_header = decode_header(email_message['From'])[0]
     if isinstance(from_header[0], bytes):
         # if it's a bytes type, decode to str
-        from_header = from_header[0].decode(from_header[1] if from_header[1] is not None else 'utf-8')  # default to 'utf-8' if encoding is None
-    senders.append(from_header)
+        sender = from_header[0].decode(from_header[1] if from_header[1] is not None else 'utf-8')  # default to 'utf-8' if encoding is None
+    else:
+        sender = from_header[0]  # If it's already a string, no need to decode
+    senders.append(sender)
 
 # unique senders
 unique_senders = list(set(senders))

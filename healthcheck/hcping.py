@@ -70,8 +70,8 @@ def http_ping(ping_url, api_key, max_time, retries):
             logging.debug(f'HTTP ping failed (attempt {i+1}/{retries}), retrying... Error: {str(e)}')
             time.sleep(1)
 
-logging.info('Performing disk test...')
 if config['DEFAULT'].getboolean('DiskTest'):
+    logging.info('Performing disk test...')
     disk_test(test_path)
 
 logging.info('Sending HTTP pings...')

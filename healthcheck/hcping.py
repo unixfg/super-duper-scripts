@@ -6,11 +6,18 @@ import requests
 import time
 import logging
 
-# Set up argument parser
+# Set up argument parser and logging
 parser = argparse.ArgumentParser(description='Disk check and http ping utility')
 parser.add_argument('--verbose', action='store_true', help='Prints verbose output')
 parser.add_argument('--silent', action='store_true', help='Suppresses all output')
 args = parser.parse_args()
+
+if args.verbose:
+    logging.basicConfig(level=logging.DEBUG)
+elif args.silent:
+    logging.basicConfig(level=logging.CRITICAL)
+else:
+    logging.basicConfig(level=logging.INFO)
 
 # Read config file
 config = configparser.ConfigParser()

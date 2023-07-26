@@ -18,9 +18,10 @@ config.read(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.ini
 
 # Get and validate config values
 test_path = config['DEFAULT']['DiskTestPath']
-if not os.path.exists(test_path) or not os.access(test_path, os.W_OK):
-    logging.error(f'Test path {test_path} does not exist or is not writable')
-    exit(1)
+if config['DEFAULT'].getboolean('DiskTest'):
+    if not os.path.exists(test_path) or not os.access(test_path, os.W_OK):
+        logging.error(f'Test path {test_path} does not exist or is not writable')
+        exit(1)
 
 max_time = int(config['DEFAULT']['MaxTime'])
 if max_time <= 0:

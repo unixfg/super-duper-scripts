@@ -15,16 +15,30 @@ def get_config_params(config_file):
     return config['DEFAULT']['API_KEY'], config['DEFAULT']['DOMAIN'], config['DEFAULT']['SUBDOMAIN'], config['DEFAULT']['DNS_SERVER'], config['DEFAULT']['IP_SERVICE_URL']
 
 def get_current_ip(ip_service_url):
-    response = requests.get(ip_service_url)
-    return response.text.strip()
+    try:
+        response = requests.get(ip_service_url)
+        return response.text.strip()
+    except requests.exceptions.RequestException as e:
+        print(f"Error getting current IP: {e}")
+        sys.exit(1)
 
 def get_existing_ip(domain, subdomain, dns_server):
-    resolver = dns.resolver.Resolver()
-    resolver.nameservers = [dns_server]
-    answers = resolver.resolve(f'{subdomain}.{domain}')
-    for rdata in answers:
-        return rdata.address
-    return None
+    try:
+        resolver = dns.resolver.Resolver()
+        resolver.nameservers = [dns_server]
+        answers = resolver.resolve(f'{subdomain}.{domain}')
+        for rdata in answers:
+            return rdata.address
+        return None
+    except dns.resolver.NXDOMAIN:
+        print(f"Error: The domain {subdomain}.{domain} does not exist.")
+        sys.exit(1)
+    except dns.resolver.Timeout:
+        print("Error: Timeout while resolving the domain.")
+        sys.exit(1)
+    except dns.resolver.NoNameservers:
+        print("Error: No nameservers specified.")
+        sys.exit(1)
 
 def update_dns_record(api_key, domain, subdomain, current_ip):
     zone_records_href = f"https://dns.api.gandi.net/api/v5/domains/{domain}"
@@ -35,8 +49,12 @@ def update_dns_record(api_key, domain, subdomain, current_ip):
         "rrset_ttl": 1200,
         "rrset_values": [current_ip]
     }
-    response = requests.put(f"{zone_records_href}/{subdomain}/A", headers=headers, json=data)
-    return response.status_code == 200
+    try:
+        response = requests.put(f"{zone_records_href}/{subdomain}/A", headers=headers, json=data)
+        return response.status_code == 200
+    except requests.exceptions.RequestException as e:
+        print(f"Error updating DNS record: {e}")
+        sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser()

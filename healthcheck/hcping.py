@@ -10,7 +10,7 @@ import urllib.parse
 
 def setup():
     # Set up argument parser and logging
-    parser = argparse.ArgumentParser(description='Disk check and http ping utility')
+    parser = argparse.ArgumentParser(description='HTTP ping utility')
     parser.add_argument('--verbose', action='store_true', help='Prints verbose output')
     parser.add_argument('--silent', action='store_true', help='Suppresses all output')
     args = parser.parse_args()
@@ -56,16 +56,6 @@ def setup():
 
     return args, config
 
-def disk_test(directory):
-    try:
-        with tempfile.NamedTemporaryFile(dir=directory) as f:
-            f.write(b'test')
-            f.flush()
-        logging.debug(f'Disk test passed on {directory}')
-    except Exception as e:
-        logging.error(f'Error: Disk test failed on {directory}, error: {str(e)}')
-        exit(1)
-
 def http_ping(http_ping_config):
     backoff_time = 1  # Start with a 1 second delay
     for i in range(http_ping_config['retries']):
@@ -85,18 +75,13 @@ def http_ping(http_ping_config):
 args, config = setup()
 
 # Do Stuff
-if config.getboolean('DEFAULT', 'DiskTest'):
-    test_directory = config['DEFAULT']['DiskTestPath']
-    logging.info('Performing disk test...')
-    disk_test(test_directory)
-
 http_ping_config = {
     'url': config['DEFAULT']['PingURL'],
     'api_key': config['DEFAULT']['APIKey'],
     'max_time': int(config['DEFAULT']['MaxTime']),
     'retries': int(config['DEFAULT']['Retries'])
 }
-logging.info('Sending HTTP pings...')
+logging.info('Sending HTTP ping...')
 http_ping(http_ping_config)
 
-logging.info('All tasks completed successfully')
+logging.info('Completed successfully')

@@ -74,7 +74,7 @@ def http_ping(ping_url, api_key, max_time, retries):
 
 if config['DEFAULT'].getboolean('DiskTest'):
     logging.info('Performing disk test...')
-    disk_test(test_path)
+    disk_test(test_directory)
 
 logging.info('Sending HTTP pings...')
 http_ping(ping_url, api_key, max_time, retries)

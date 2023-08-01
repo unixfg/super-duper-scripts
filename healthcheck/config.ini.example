@@ -1,5 +1,5 @@
 [DEFAULT]
-DiskTestPath = /tmp/test
+DiskTestPath = /tmp
 MaxTime = 10
 Retries = 5
 APIKey = API_KEY_HERE

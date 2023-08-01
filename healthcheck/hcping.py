@@ -5,6 +5,7 @@ import argparse
 import requests
 import time
 import logging
+import testfile
 
 # Set up argument parser and logging
 parser = argparse.ArgumentParser(description='Disk check and http ping utility')
@@ -24,10 +25,10 @@ config = configparser.ConfigParser()
 config.read(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.ini'))
 
 # Get and validate config values
-test_path = config['DEFAULT']['DiskTestPath']
+test_directory = config['DEFAULT']['DiskTestPath']
 if config['DEFAULT'].getboolean('DiskTest'):
-    if not os.path.exists(test_path) or not os.access(test_path, os.W_OK):
-        logging.error(f'Test path {test_path} does not exist or is not writable')
+    if not os.path.exists(test_directory) or not os.access(test_directory, os.W_OK):
+        logging.error(f'Test directory {test_directory} does not exist or is not writable')
         exit(1)
 
 max_time = int(config['DEFAULT']['MaxTime'])
@@ -46,14 +47,15 @@ try:
     requests.get(ping_url)
 except requests.exceptions.MissingSchema:
     logging.error(f'Ping URL {ping_url} is not a valid URL')
-def disk_test(test_path):
+
+def disk_test(directory):
     try:
-        with open(test_path, 'w') as f:
-            f.write('test')
-        os.remove(test_path)
-        logging.debug(f'Disk test passed on {test_path}')
-    except:
-        logging.error(f'Error: Disk test failed on {test_path}')
+        with tempfile.NamedTemporaryFile(dir=directory) as f:
+            f.write(b'test')
+            f.flush()
+        logging.debug(f'Disk test passed on {directory}')
+    except Exception as e:
+        logging.error(f'Error: Disk test failed on {directory}, error: {str(e)}')
         exit(1)
 
 def http_ping(ping_url, api_key, max_time, retries):

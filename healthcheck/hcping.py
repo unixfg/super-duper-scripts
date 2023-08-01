@@ -57,6 +57,8 @@ def http_ping(http_ping_config):
     for i in range(http_ping_config['retries']):
         try:
             response = requests.get(f"{http_ping_config['url']}/{http_ping_config['api_key']}", timeout=http_ping_config['max_time'])
+            response.raise_for_status()  # Check if the request was successful
+            break  # If the request was successful, break the loop
         except requests.exceptions.RequestException as e:
             if i == http_ping_config['retries'] - 1:
                 logging.error(f'Error: All {http_ping_config["retries"]} HTTP ping attempts failed. Last error: {str(e)}')

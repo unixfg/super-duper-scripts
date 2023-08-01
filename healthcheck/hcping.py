@@ -9,16 +9,27 @@ import tempfile
 import urllib.parse
 
 def setup():
+    """
+    Reads and validates the configuration file, sets up logging, and returns the config dictionary
+    
+    Parameters:
+    None
+
+    Returns:
+    args: argparse.Namespace
+    http_ping_config: dict containing the configuration values for the HTTP ping
+    """
+
     # Set up argument parser and logging
     parser = argparse.ArgumentParser(description='HTTP ping utility')
     parser.add_argument('--verbose', action='store_true', help='Prints verbose output')
     parser.add_argument('--silent', action='store_true', help='Suppresses all output')
     args = parser.parse_args()
 
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
-    elif args.silent:
+    if args.silent:
         logging.basicConfig(level=logging.CRITICAL)
+    elif args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
 
@@ -36,12 +47,12 @@ def setup():
     if not api_key:
         logging.error('API key is missing in the configuration file')
         exit(1)
-
     ping_url = config['DEFAULT']['PingURL']
     if not ping_url:
         logging.error('Ping URL is missing in the configuration file')
         exit(1)
 
+    # Create the URL from the config values and validate it
     full_url = f"{ping_url}/{api_key}"
     try:
         result = urllib.parse.urlparse(full_url)
@@ -54,13 +65,30 @@ def setup():
         logging.error(f'Error parsing URL: {full_url}, error: {str(e)}')
         exit(1)
 
-    return args, config
+    # Create the config dictionary that will be passed to the HTTP ping function
+    http_ping_config = {
+    'url': config['DEFAULT']['FullURL'],
+    'max_time': int(config['DEFAULT']['MaxTime']),
+    'retries': int(config['DEFAULT']['Retries'])
+    }
+
+    return args, http_ping_config
 
 def http_ping(http_ping_config):
-    backoff_time = 1  # Start with a 1 second delay
+    """
+    Sends an HTTP ping to the specified URL
+    
+    Parameters:
+    http_ping_config: dict containing the configuration values for the HTTP ping
+
+    Returns:
+    None
+    """
+
+    backoff_time = 2  # Start with a 2 second delay
     for i in range(http_ping_config['retries']):
         try:
-            response = requests.get(f"{http_ping_config['url']}/{http_ping_config['api_key']}", timeout=http_ping_config['max_time'])
+            response = requests.get(f"{http_ping_config['url']}", timeout=http_ping_config['max_time'])
             response.raise_for_status()  # Check if the request was successful
             break  # If the request was successful, break the loop
         except requests.exceptions.RequestException as e:
@@ -69,18 +97,12 @@ def http_ping(http_ping_config):
                 exit(1)
             logging.debug(f'HTTP ping failed (attempt {i+1}/{http_ping_config["retries"]}), retrying in {backoff_time} seconds... Error: {str(e)}')
             time.sleep(backoff_time)
-            backoff_time *= 2  # Double the delay for the next attempt
+            backoff_time *= 1.5  # Increase the delay for the next attempt
 
 # Run Setup
-args, config = setup()
+args, http_ping_config = setup()
 
 # Do Stuff
-http_ping_config = {
-    'url': config['DEFAULT']['PingURL'],
-    'api_key': config['DEFAULT']['APIKey'],
-    'max_time': int(config['DEFAULT']['MaxTime']),
-    'retries': int(config['DEFAULT']['Retries'])
-}
 logging.info('Sending HTTP ping...')
 http_ping(http_ping_config)
 

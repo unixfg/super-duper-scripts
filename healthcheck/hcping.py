@@ -5,7 +5,7 @@ import argparse
 import requests
 import time
 import logging
-import testfile
+import tempfile
 
 # Set up argument parser and logging
 parser = argparse.ArgumentParser(description='Disk check and http ping utility')

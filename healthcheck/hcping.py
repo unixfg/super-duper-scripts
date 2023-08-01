@@ -6,6 +6,7 @@ import requests
 import time
 import logging
 import tempfile
+import urllib.parse
 
 def setup():
     # Set up argument parser and logging
@@ -35,9 +36,22 @@ def setup():
     if not api_key:
         logging.error('API key is missing in the configuration file')
         exit(1)
-    
-    if 'DiskTestPath' not in config['DEFAULT']:
-        logging.error('DiskTestPath is missing in the configuration file')
+
+    ping_url = config['DEFAULT']['PingURL']
+    if not ping_url:
+        logging.error('Ping URL is missing in the configuration file')
+        exit(1)
+
+    full_url = f"{ping_url}/{api_key}"
+    try:
+        result = urllib.parse.urlparse(full_url)
+        if all([result.scheme, result.netloc]):
+            logging.debug(f'Full URL is well-formed: {full_url}')
+        else:
+            logging.error(f'Full URL is not well-formed: {full_url}')
+            exit(1)
+    except Exception as e:
+        logging.error(f'Error parsing URL: {full_url}, error: {str(e)}')
         exit(1)
 
     return args, config

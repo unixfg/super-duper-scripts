@@ -7,6 +7,19 @@ import argparse
 import sys
 
 def get_config_params(config_file):
+    """
+    Read and validate the configuration file.
+
+    Parameters:
+    config_file: str containing the path to the configuration file
+
+    Returns:
+    api_key: str containing the API key
+    domain: str containing the domain
+    subdomain: str containing the subdomain
+    dns_server: str containing the DNS server
+    ip_service_url: str containing the URL of the IP service
+    """
     config = configparser.ConfigParser()
     if not os.path.isfile(config_file):
         print(f"Configuration file {config_file} not found. Please make sure it exists and contains the necessary parameters.")
@@ -15,6 +28,15 @@ def get_config_params(config_file):
     return config['DEFAULT']['API_KEY'], config['DEFAULT']['DOMAIN'], config['DEFAULT']['SUBDOMAIN'], config['DEFAULT']['DNS_SERVER'], config['DEFAULT']['IP_SERVICE_URL']
 
 def get_current_ip(ip_service_url):
+    """
+    Get the current public IP address.
+
+    Parameters:
+    ip_service_url: str containing the URL of the IP service
+    
+    Returns:
+    str containing the current public IP address
+    """
     try:
         response = requests.get(ip_service_url)
         return response.text.strip()
@@ -23,6 +45,17 @@ def get_current_ip(ip_service_url):
         sys.exit(1)
 
 def get_existing_ip(domain, subdomain, dns_server):
+    """
+    Get the existing IP address of the subdomain.
+
+    Parameters:
+    domain: str containing the domain
+    subdomain: str containing the subdomain
+    dns_server: str containing the DNS server
+
+    Returns:
+    str containing the existing IP address of the subdomain
+    """
     try:
         resolver = dns.resolver.Resolver()
         resolver.nameservers = [dns_server]
@@ -41,6 +74,18 @@ def get_existing_ip(domain, subdomain, dns_server):
         sys.exit(1)
 
 def update_dns_record(api_key, domain, subdomain, current_ip):
+    """
+    Call the Gandi API to update the DNS record.
+
+    Parameters:
+    api_key: str containing the API key
+    domain: str containing the domain
+    subdomain: str containing the subdomain
+    current_ip: str containing the current public IP address
+
+    Returns:
+    True if the DNS record was successfully updated, False otherwise
+    """
     zone_records_href = f"https://dns.api.gandi.net/api/v5/domains/{domain}"
     headers = {"X-Api-Key": api_key, "Content-Type": "application/json"}
     data = {
@@ -57,6 +102,7 @@ def update_dns_record(api_key, domain, subdomain, current_ip):
         sys.exit(1)
 
 def main():
+    # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--silent', help='If set, no output will be printed to the console', action='store_true')
     parser.add_argument('--verbose', help='If set, additional output will be printed to the console', action='store_true')

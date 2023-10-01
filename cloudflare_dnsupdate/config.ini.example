@@ -1,5 +1,8 @@
+[Cloudflare]
+API_TOKEN = XXXXXXXXXX
+ZONE_ID = XXXXXXXXXX
+
 [DEFAULT]
-API_TOKEN = cftoken
 DOMAIN = yourdomain
 SUBDOMAIN = yoursubdomain
 DNS_SERVER = 8.8.8.8

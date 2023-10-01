@@ -6,6 +6,30 @@ import configparser
 import argparse
 import sys
 
+def setup():
+    """
+    Parse arguments and read the configuration file.
+
+    Returns:
+    args: Namespace object containing the arguments.
+    api_key: str containing the API key.
+    domain: str containing the domain.
+    subdomain: str containing the subdomain.
+    dns_server: str containing the DNS server.
+    ip_service_url: str containing the URL of the IP service.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--silent', help='If set, no output will be printed to the console', action='store_true')
+    parser.add_argument('--verbose', help='If set, additional output will be printed to the console', action='store_true')
+    args = parser.parse_args()
+
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    config_file = os.path.join(script_dir, 'config.ini')
+
+    api_key, domain, subdomain, dns_server, ip_service_url = get_config_params(config_file)
+
+    return args, api_key, domain, subdomain, dns_server, ip_service_url
+
 def get_config_params(config_file):
     """
     Read and validate the configuration file.
@@ -102,33 +126,37 @@ def update_dns_record(api_key, domain, subdomain, current_ip):
         sys.exit(1)
 
 def main():
-    # Parse arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--silent', help='If set, no output will be printed to the console', action='store_true')
-    parser.add_argument('--verbose', help='If set, additional output will be printed to the console', action='store_true')
-    args = parser.parse_args()
+    """
+    Makes and prints comparisons then calls the update_dns_record function.
+    """
+    args, api_key, domain, subdomain, dns_server, ip_service_url = setup()
 
-    # Define the path to the config file
-    script_dir = os.path.dirname(os.path.realpath(__file__))
-    config_file = os.path.join(script_dir, 'config.ini')
-
-    api_key, domain, subdomain, dns_server, ip_service_url = get_config_params(config_file)
+    if args.verbose:
+        print(f"API key: {api_key}")
+        print(f"Domain: {domain}")
+        print(f"Subdomain: {subdomain}")
+        print(f"DNS server: {dns_server}")
+        print(f"IP service URL: {ip_service_url}")
 
     current_ip = get_current_ip(ip_service_url)
-    if args.verbose: print(f'Current IP: {current_ip}')
+    if args.verbose:
+        print(f"Current IP: {current_ip}")
 
     existing_ip = get_existing_ip(domain, subdomain, dns_server)
-    if args.verbose: print(f'Existing IP: {existing_ip}')
+    if args.verbose:
+        print(f"Existing IP: {existing_ip}")
 
     if current_ip != existing_ip:
+        if not args.silent:
+            print(f"Updating DNS record for {subdomain}.{domain} to {current_ip}")
         if update_dns_record(api_key, domain, subdomain, current_ip):
-            if not args.silent: print(f'Successfully updated DNS record of {subdomain}.{domain} to {current_ip}')
+            if not args.silent:
+                print("DNS record successfully updated")
         else:
-            if not args.silent: print(f'Failed to update DNS record of {subdomain}.{domain}')
-    elif current_ip == existing_ip:
-        if args.verbose: print('IP address has not changed')
+            print("Error updating DNS record")
     else:
-        print('Unknown error')
+        if not args.silent:
+            print("DNS record is up to date")
 
 if __name__ == "__main__":
     main()

@@ -6,6 +6,9 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 import openai
+import time
+
+ADMIN_ROLE_NAME = "Nerds"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -54,21 +57,23 @@ async def add_message_to_thread(thread_id, message_content):
 
 
 async def create_run_and_get_response(thread_id):
-    # ... [existing function code]
-
     try:
         # Create a run
         logging.info(f"Creating a run for thread ID: {thread_id}")
         run = openai_client.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant_id)
         run_id = run.id
 
-        # Poll for the run's completion with a timeout
-        timeout = 10  # seconds
-        start_time = asyncio.time()
+        # Initialize polling variables
+        timeout = 60  # Total timeout in seconds
+        start_time = time.time()
+        interval = 1  # Initial polling interval in seconds
+        max_interval = 5  # Maximum polling interval
+
         while True:
-            if asyncio.time() - start_time > timeout:
+            current_time = time.time()
+            if current_time - start_time > timeout:
                 # Cancel the run if it takes too long
-                logging.info(f"Run {run_id} is taking too long. Canceling...")
+                logging.info(f"Run {run_id} timed out. Canceling...")
                 openai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id)
                 break
 
@@ -76,25 +81,45 @@ async def create_run_and_get_response(thread_id):
             if run_status.status == 'completed':
                 logging.info(f"Run {run_id} completed")
                 break
-            await asyncio.sleep(1)  # Sleep for a short period before polling again
+
+            await asyncio.sleep(interval)
+            interval = min(max_interval, interval + 1)  # Increment the interval
 
         # Retrieve the thread messages
         thread_messages = openai_client.beta.threads.messages.list(thread_id)
-
-        # Find the latest assistant's response
-        response_messages = [msg for msg in reversed(thread_messages.data) if msg.role == 'assistant']
-
-        # Extract and concatenate text from each message content
-        response_text = ""
-        for msg in response_messages:
-            for content in msg.content:
-                if content.type == 'text':
-                    response_text += content.text.value + "\n"
-
-        return response_text.strip() if response_text else None
+        latest_response = next((msg for msg in thread_messages.data if msg.role == 'assistant'), None)
+        
+        # Parse the response
+        if latest_response:
+            return parse_response(latest_response)
+        return None
     except Exception as e:
         logging.error(f"Error in run or retrieving messages: {e}")
-        return None
+        # Attempt to fetch the message even in case of error
+        thread_messages = openai_client.beta.threads.messages.list(thread_id)
+        latest_response = next((msg for msg in thread_messages.data if msg.role == 'assistant'), None)
+        return parse_response(latest_response) if latest_response else None
+
+def parse_response(latest_response):
+    """Parse the latest response to extract text."""
+    response_text = ""
+    for content in latest_response.content:
+        if content.type == 'text':
+            response_text += content.text.value + "\n"
+    return response_text.strip()
+
+async def is_user_admin_in_any_server(user):
+    """Check if the user is an admin in any server the bot is in."""
+    for guild in bot.guilds:
+        member = guild.get_member(user.id)
+        if member and any(role.permissions.administrator for role in member.roles):
+            return True
+    return False
+
+async def is_user_admin_in_server(user, guild):
+    """Check if the user is an admin in the specified server."""
+    member = guild.get_member(user.id)
+    return member and any(role.permissions.administrator for role in member.roles)
 
 @bot.event
 async def on_ready():
@@ -107,6 +132,18 @@ async def on_message(message):
 
     # Check if the message is a DM
     is_dm = isinstance(message.channel, discord.DMChannel)
+
+    if is_dm:
+        # Check if the sender is an admin in any server
+        if not await is_user_admin_in_any_server(message.author):
+            logging.info(f"Ignoring DM from non-admin user: {message.author}")
+            return  # Ignore DMs from non-admins
+    else:
+        # In server channels, only respond to mentions if the user is an admin
+        if bot.user.mentioned_in(message):
+            if not await is_user_admin_in_server(message.author, message.guild):
+                logging.info(f"Ignoring mention from non-admin user: {message.author} in server: {message.guild.name}")
+                return  # Ignore mentions from non-admins
 
     discord_channel_id = str(message.channel.id)
     openai_thread_id = get_openai_thread_id(discord_channel_id)

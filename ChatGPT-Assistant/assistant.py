@@ -13,11 +13,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Load environment variables
 load_dotenv()
 
-# Retrieve the assistant ID
-assistant_id = os.getenv('ASSISTANT_ID')
-
 # Initialize OpenAI client
 openai_client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+assistant_id = os.getenv('ASSISTANT_ID')
 
 # Database setup
 conn = sqlite3.connect('bot_data.db')
@@ -56,18 +54,29 @@ async def add_message_to_thread(thread_id, message_content):
 
 
 async def create_run_and_get_response(thread_id):
-    """Create a run for the given thread and retrieve the response when ready."""
+    # ... [existing function code]
+
     try:
         # Create a run
+        logging.info(f"Creating a run for thread ID: {thread_id}")
         run = openai_client.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant_id)
-        run_id = run.id  # Use dot notation to access the id
+        run_id = run.id
 
-        # Poll for the run's completion
+        # Poll for the run's completion with a timeout
+        timeout = 10  # seconds
+        start_time = asyncio.time()
         while True:
-            run_status = openai_client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
-            if run_status.status == 'completed':  # Use dot notation
+            if asyncio.time() - start_time > timeout:
+                # Cancel the run if it takes too long
+                logging.info(f"Run {run_id} is taking too long. Canceling...")
+                openai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id)
                 break
-            await asyncio.sleep(2)  # Sleep for a short period before polling again
+
+            run_status = openai_client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
+            if run_status.status == 'completed':
+                logging.info(f"Run {run_id} completed")
+                break
+            await asyncio.sleep(1)  # Sleep for a short period before polling again
 
         # Retrieve the thread messages
         thread_messages = openai_client.beta.threads.messages.list(thread_id)

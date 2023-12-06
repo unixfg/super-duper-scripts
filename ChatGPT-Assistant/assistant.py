@@ -67,26 +67,15 @@ def get_or_create_thread_id(channel_id):
     conn.commit()
     return thread_id
 
-# Bot event handlers
-@bot.event
-async def on_ready():
-    logger.info('Bot is ready!')
-    if 'BOT_CHANNEL_ID' in locals():
-        channel = bot.get_channel(int(BOT_CHANNEL_ID))
-        if channel:
-            await channel.send("ChadGPT is Online.")
+# Add message to thread
+async def add_message_to_thread(thread_id, message_content):
+    try:
+        openai_client.beta.threads.messages.create(thread_id, role="user", content=message_content)
+    except Exception as e:
+        logger.error(f"Error adding message to OpenAI thread: {e}")
 
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-
-    if not is_admin(message.author) and not message.content.startswith('/'):
-        return
-
-    thread_id = get_or_create_thread_id(str(message.channel.id))
-
-    # Generate and send response
+# Generate response from OpenAI
+async def generate_response_from_openai(thread_id):
     try:
         response = openai_client.beta.threads.runs.create(thread_id=thread_id, assistant_id=ASSISTANT_ID)
         run_id = response.id
@@ -101,16 +90,40 @@ async def on_message(message):
         # Handle incomplete run
         if run_status.status != 'completed':
             openai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id)
-            logger.info(f"Thread {thread_id}, run {run_id} timed out and was cancelled.")
+            logger.info(f"Run {run_id} timed out and was cancelled.")
 
-        # Retrieve and send the response
         messages = openai_client.beta.threads.messages.list(thread_id=thread_id)
         latest_response = next((m for m in messages.data if m.role == 'assistant'), None)
 
-        if latest_response:
-            await message.reply(latest_response.content[0].text.value)
+        return latest_response.content[0].text.value if latest_response else None
     except Exception as e:
         logger.error(f"Error in OpenAI response generation: {e}")
+        return None
+
+# Bot event handlers
+@bot.event
+async def on_ready():
+    logger.info('Bot is ready!')
+    if BOT_CHANNEL_ID:
+        channel = bot.get_channel(int(BOT_CHANNEL_ID))
+    if channel:
+        await channel.send("ChadGPT is Online.")
+
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+
+    thread_id = get_or_create_thread_id(str(message.channel.id))
+    await add_message_to_thread(thread_id, message.content)
+
+    # Check for @mention in channels or if it's a DM from the admin
+    should_respond = (bot.user.mentioned_in(message) and not isinstance(message.channel, discord.DMChannel)) or (isinstance(message.channel, discord.DMChannel) and is_admin(message.author))
+
+    if should_respond:
+        response = await generate_response_from_openai(thread_id)
+        if response:
+            await message.reply(response)
 
     await bot.process_commands(message)
 

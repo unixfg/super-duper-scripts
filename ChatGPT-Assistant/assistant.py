@@ -15,15 +15,15 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 ASSISTANT_ID = os.getenv('ASSISTANT_ID')
 ADMIN_USER_ID = os.getenv('ADMIN_USER_ID')
+USERS_ROLE_ID = os.getenv('USERS_ROLE_ID')
 BOT_CHANNEL_ID = os.getenv('BOT_CHANNEL_ID')
 
 # Configure the root logger with a standard format
-logging.basicConfig(level=logging.DEBUG, 
+logging.basicConfig(level=logging.WARN, 
                     format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
 # Create and configure your bot's logger
 logger = logging.getLogger('bot')
-logger.setLevel(logging.INFO)
 
 # OpenAI client initialization
 openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
@@ -40,22 +40,18 @@ intents.dm_messages = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 # RBAC Check
-def is_admin(user):
-    return str(user.id) == ADMIN_USER_ID
+def get_user_role(member):
+    # Check if the member is an admin
+    if str(member.id) == ADMIN_USER_ID:
+        return "admin"
 
-# Bot commands
-@bot.command()
-async def toggledebug(ctx):
-    if not is_admin(ctx.author):
-        await ctx.send("You do not have permission to use this command.")
-        return
+    # Check if the member has the specific role
+    for role in member.roles:
+        if str(role.id) == USERS_ROLE_ID:
+            return "user"
 
-    if logger.level == logging.INFO:
-        logger.setLevel(logging.DEBUG)
-        await ctx.send("Debug mode enabled.")
-    else:
-        logger.setLevel(logging.INFO)
-        await ctx.send("Debug mode disabled.")
+    # If neither, return None or "unknown"
+    return "unknown"
 
 # Retrieve or create a thread ID for a channel
 def get_or_create_thread_id(channel_id):
@@ -81,19 +77,21 @@ async def add_message_to_thread(thread_id, message_content):
         logger.error(f"Error adding message to OpenAI thread: {e}")
 
 # Generate response from OpenAI
-async def generate_response_from_openai(thread_id):
+async def generate_response_from_openai(thread_id, message):
     try:
         logger.debug(f"Starting run for thread_id: {thread_id}")
         response = openai_client.beta.threads.runs.create(thread_id=thread_id, assistant_id=ASSISTANT_ID)
         run_id = response.id
         logger.debug(f"Run started: {run_id}")
 
+        # Start typing notification
+        async with message.channel.typing():
         # Poll for run completion
-        for _ in range(60):
-            run_status = openai_client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
-            if run_status.status == 'completed':
-                logger.debug(f"Run completed: {run_id}")
-                break
+            for _ in range(60):
+                run_status = openai_client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
+                if run_status.status == 'completed':
+                    logger.debug(f"Run completed: {run_id}")
+                    break
             await asyncio.sleep(1)
 
         # Handle incomplete run
@@ -125,16 +123,37 @@ async def on_message(message):
         return
 
     logger.debug(f"Received message from {message.author}: {message.content}")
+
+    is_dm = message.channel.type == discord.ChannelType.private
+    mentioned = bot.user.mentioned_in(message)
+    user_role = get_user_role(message.author)
+
+    logger.debug(f"Message is DM: {is_dm}, Bot mentioned: {mentioned}, User Role: {user_role}")
+
+    if is_dm and user_role != "admin":
+        logger.debug(f"Ignoring DM from non-admin user: {message.author} (ID: {message.author.id})")
+        return
+
+    # Additional check for @tagged messages in a channel
+    if not is_dm and "@" in message.content and user_role not in ["admin", "user"]:
+        logger.debug("Ignoring @tagged message from non-privileged user")
+        return
+
     thread_id = get_or_create_thread_id(str(message.channel.id))
     await add_message_to_thread(thread_id, message.content)
 
-    # Only generate a response if the bot is mentioned or if it's a DM from the admin
-    should_respond = (bot.user.mentioned_in(message) and not isinstance(message.channel, discord.DMChannel)) or (isinstance(message.channel, discord.DMChannel) and is_admin(message.author))
+    should_respond = (mentioned and not is_dm) or (is_dm and user_role in ["admin", "user"])
+    logger.debug(f"Should respond: {should_respond}")
 
     if should_respond:
-        response = await generate_response_from_openai(thread_id)
+        logger.debug(f"Generating response for thread_id: {thread_id}")
+        response = await generate_response_from_openai(thread_id, message)
         if response:
             await message.reply(response)
+        else:
+            logger.debug("No response generated")
+    else:
+        logger.debug("Conditions for generating response not met")
 
     await bot.process_commands(message)
 

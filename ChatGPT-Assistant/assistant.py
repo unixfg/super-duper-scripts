@@ -76,33 +76,51 @@ async def add_message_to_thread(thread_id, message_content):
     except Exception as e:
         logger.error(f"Error adding message to OpenAI thread: {e}")
 
-# Generate response from OpenAI
-async def generate_response_from_openai(thread_id, message):
+    
+async def poll_run_status_and_handle_response(thread_id, message, max_retries=1):
+    """
+    Polls the run status, handles the response based on the status, and retries if necessary.
+
+    Args:
+    thread_id (str): The thread ID in OpenAI.
+    message (discord.Message): The original Discord message.
+    max_retries (int): Maximum number of retries for failed runs.
+
+    Returns:
+    str or None: The response from OpenAI or None if no response is generated.
+    """
     try:
-        logger.debug(f"Starting run for thread_id: {thread_id}")
         response = openai_client.beta.threads.runs.create(thread_id=thread_id, assistant_id=ASSISTANT_ID)
         run_id = response.id
         logger.debug(f"Run started: {run_id}")
 
-        # Start typing notification
         async with message.channel.typing():
-        # Poll for run completion
-            for _ in range(60):
+            retries = 0
+            while retries <= max_retries:
                 run_status = openai_client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
-                if run_status.status == 'completed':
-                    logger.debug(f"Run completed: {run_id}")
+                if run_status.status in ['completed', 'failed', 'expired', 'cancelled']:
                     break
-            await asyncio.sleep(1)
+                if run_status.status == 'requires_action':
+                    openai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id)
+                    logger.warning(f"Run {run_id} required action and was cancelled.")
+                    return None
+                await asyncio.sleep(1)
 
-        # Handle incomplete run
-        if run_status.status != 'completed':
-            openai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id)
-            logger.warning(f"Run {run_id} timed out and was cancelled.")
+                if run_status.status == 'failed':
+                    retries += 1
+                    if retries <= max_retries:
+                        logger.info(f"Retrying failed run: attempt {retries}")
+                        response = openai_client.beta.threads.runs.create(thread_id=thread_id, assistant_id=ASSISTANT_ID)
+                        run_id = response.id
 
-        messages = openai_client.beta.threads.messages.list(thread_id=thread_id)
-        latest_response = next((m for m in messages.data if m.role == 'assistant'), None)
+            if run_status.status != 'completed':
+                logger.info(f"Run {run_id} ended with status: {run_status.status}")
+                return None
 
-        return latest_response.content[0].text.value if latest_response else None
+            messages = openai_client.beta.threads.messages.list(thread_id=thread_id)
+            latest_response = next((m for m in messages.data if m.role == 'assistant'), None)
+            return latest_response.content[0].text.value if latest_response else None
+
     except Exception as e:
         logger.error(f"Error in OpenAI response generation: {e}")
         return None

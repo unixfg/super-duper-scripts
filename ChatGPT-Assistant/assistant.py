@@ -106,8 +106,8 @@ async def on_ready():
     logger.info('Bot is ready!')
     if BOT_CHANNEL_ID:
         channel = bot.get_channel(int(BOT_CHANNEL_ID))
-    if channel:
-        await channel.send("ChadGPT is Online.")
+        if channel:
+            await channel.send("ChadGPT is Online.")
 
 @bot.event
 async def on_message(message):

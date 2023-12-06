@@ -83,20 +83,23 @@ async def add_message_to_thread(thread_id, message_content):
 # Generate response from OpenAI
 async def generate_response_from_openai(thread_id):
     try:
+        logger.debug(f"Starting run for thread_id: {thread_id}")
         response = openai_client.beta.threads.runs.create(thread_id=thread_id, assistant_id=ASSISTANT_ID)
         run_id = response.id
+        logger.debug(f"Run started: {run_id}")
 
         # Poll for run completion
         for _ in range(60):
             run_status = openai_client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
             if run_status.status == 'completed':
+                logger.debug(f"Run completed: {run_id}")
                 break
             await asyncio.sleep(1)
 
         # Handle incomplete run
         if run_status.status != 'completed':
             openai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id)
-            logger.info(f"Run {run_id} timed out and was cancelled.")
+            logger.warning(f"Run {run_id} timed out and was cancelled.")
 
         messages = openai_client.beta.threads.messages.list(thread_id=thread_id)
         latest_response = next((m for m in messages.data if m.role == 'assistant'), None)

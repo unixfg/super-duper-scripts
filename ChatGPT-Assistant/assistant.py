@@ -17,9 +17,13 @@ ASSISTANT_ID = os.getenv('ASSISTANT_ID')
 ADMIN_USER_ID = os.getenv('ADMIN_USER_ID')
 BOT_CHANNEL_ID = os.getenv('BOT_CHANNEL_ID')
 
-# Logger setup
-logger = logging.getLogger('discord')
-logger.setLevel(logging.DEBUG)  # Set to DEBUG for detailed logs
+# Configure the root logger with a standard format
+logging.basicConfig(level=logging.DEBUG, 
+                    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
+# Create and configure your bot's logger
+logger = logging.getLogger('bot')
+logger.setLevel(logging.INFO)
 
 # OpenAI client initialization
 openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
@@ -131,4 +135,4 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-bot.run(DISCORD_TOKEN)
+bot.run(DISCORD_TOKEN, log_handler=None, log_level=logging.DEBUG)

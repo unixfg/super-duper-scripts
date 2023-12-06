@@ -19,7 +19,7 @@ BOT_CHANNEL_ID = os.getenv('BOT_CHANNEL_ID')
 
 # Logger setup
 logger = logging.getLogger('discord')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.DEBUG)  # Set to DEBUG for detailed logs
 
 # OpenAI client initialization
 openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
@@ -59,8 +59,10 @@ def get_or_create_thread_id(channel_id):
     result = cursor.fetchone()
     
     if result:
+        logger.debug(f"Found existing thread ID for channel {channel_id}")
         return result[0]
 
+    logger.debug(f"Creating new thread for channel {channel_id}")
     thread = openai_client.beta.threads.create()
     thread_id = thread.id
     cursor.execute("INSERT INTO thread_mapping (discord_channel_id, openai_thread_id) VALUES (?, ?)", (channel_id, thread_id))
@@ -112,12 +114,14 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     if message.author.bot:
+        logger.debug("Ignoring bot message")
         return
 
+    logger.debug(f"Received message from {message.author}: {message.content}")
     thread_id = get_or_create_thread_id(str(message.channel.id))
     await add_message_to_thread(thread_id, message.content)
 
-    # Check for @mention in channels or if it's a DM from the admin
+    # Only generate a response if the bot is mentioned or if it's a DM from the admin
     should_respond = (bot.user.mentioned_in(message) and not isinstance(message.channel, discord.DMChannel)) or (isinstance(message.channel, discord.DMChannel) and is_admin(message.author))
 
     if should_respond:

@@ -42,7 +42,7 @@ def get_volume_labels(volumes):
         cmd = ['docker', 'volume', 'inspect'] + volume_names
         result = subprocess.run(cmd, stdout=subprocess.PIPE, text=True, check=True)
         volumes_info = json.loads(result.stdout)
-        volume_labels = {v['Name']: v.get('Labels', {}) for v in volumes_info}
+        volume_labels = {v['Name']: v.get('Labels') or {} for v in volumes_info}
         logging.info(f"Retrieved labels for {len(volumes_info)} volumes.")
         return volume_labels
     except subprocess.CalledProcessError as e:
@@ -70,14 +70,14 @@ def filter_named_volumes(volumes, volume_labels):
 
 def generate_volume_mappings(volumes):
     """
-    Generates Docker Compose volume mappings for the given volumes.
+    Generates volume mappings for the given volumes.
     Returns a list of volume mapping strings.
     """
     mappings = []
     for name in volumes:
         # Map the volume to /mnt/source/<volume_name> in the container
         container_path = f"/mnt/source/{name}"
-        mapping = f"      - {name}:{container_path}:ro"
+        mapping = f"{name}:{container_path}:ro"
         mappings.append(mapping)
         logging.debug(f"Generated mapping for volume: {name}")
     return mappings
@@ -101,62 +101,31 @@ def get_root_directories():
             # Generate a unique container path
             container_path = dir.replace('/', '_').strip('_')
             container_path = f"/mnt/source/root/{container_path}"
-            mapping = f"      - {dir}:{container_path}:ro"
+            mapping = f"{dir}:{container_path}:ro"
             mappings.append(mapping)
             logging.debug(f"Added root directory mapping: {dir}")
         else:
             logging.warning(f"Root directory does not exist and will be skipped: {dir}")
     return mappings
 
-def update_docker_compose(volume_mappings):
+def generate_compose_file(volume_mappings, volume_declarations, output_file='volumes-compose.yml'):
     """
-    Updates the 'docker-compose.yml' file with the given volume mappings.
+    Generates a Docker Compose file containing the volume mappings and declarations.
     """
-    compose_file = 'docker-compose.yml'
-
-    if not os.path.isfile(compose_file):
-        logging.error(f"'{compose_file}' not found.")
-        sys.exit(1)
-
+    compose_data = {
+        'services': {
+            'borgmatic': {
+                'volumes': volume_mappings
+            }
+        },
+        'volumes': volume_declarations
+    }
     try:
-        with open(compose_file, 'r') as f:
-            compose = yaml.safe_load(f)
+        with open(output_file, 'w') as f:
+            yaml.dump(compose_data, f, default_flow_style=False)
+        logging.info(f"Generated volume mappings compose file: {output_file}")
     except Exception as e:
-        logging.error(f"Failed to read '{compose_file}': {e}")
-        sys.exit(1)
-
-    services = compose.get('services', {})
-    borgmatic_service = services.get('borgmatic', {})
-
-    existing_volumes = borgmatic_service.get('volumes', [])
-    # Preserve non-backup volumes (e.g., App Config volumes)
-    app_config_volumes = [v for v in existing_volumes if v.strip().startswith('- ./') or v.strip().startswith('- /')]
-    # Remove backup volume mappings
-    new_volumes = app_config_volumes + volume_mappings
-
-    borgmatic_service['volumes'] = new_volumes
-    services['borgmatic'] = borgmatic_service
-    compose['services'] = services
-
-    # Ensure the volumes are declared under the 'volumes' key
-    compose_volumes = compose.get('volumes', {})
-    for mapping in volume_mappings:
-        # Extract the volume name from the mapping
-        volume_name = mapping.strip().split(':')[0].strip('- ')
-        if volume_name.startswith('/'):
-            # Skip host directories
-            continue
-        if volume_name not in compose_volumes:
-            compose_volumes[volume_name] = {'external': True}
-            logging.debug(f"Added volume to 'volumes' section: {volume_name}")
-    compose['volumes'] = compose_volumes
-
-    try:
-        with open(compose_file, 'w') as f:
-            yaml.dump(compose, f, default_flow_style=False)
-        logging.info(f"Updated '{compose_file}' successfully.")
-    except Exception as e:
-        logging.error(f"Failed to write to '{compose_file}': {e}")
+        logging.error(f"Failed to write to '{output_file}': {e}")
         sys.exit(1)
 
 def main():
@@ -166,9 +135,18 @@ def main():
     named_volumes = filter_named_volumes(volumes_info, volume_labels)
     volume_mappings = generate_volume_mappings(named_volumes)
     root_mappings = get_root_directories()
+
     all_mappings = root_mappings + volume_mappings
-    update_docker_compose(all_mappings)
+
+    # Prepare volume declarations for named volumes
+    volume_declarations = {name: {'external': True} for name in named_volumes}
+
+    generate_compose_file(all_mappings, volume_declarations)
     logging.info("Volume mappings generation completed successfully.")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logging.error(f"An unexpected error occurred: {e}")
+        sys.exit(1)

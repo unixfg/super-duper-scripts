@@ -97,18 +97,21 @@ def get_existing_ip(domain, subdomain, dns_server):
     dns_server: str containing the DNS server
 
     Returns:
-    str containing the existing IP address of the subdomain
+    str containing the existing IP address of the subdomain, or None if it doesn't exist
     """
     try:
         resolver = dns.resolver.Resolver()
         resolver.nameservers = [dns_server]
-        answers = resolver.resolve(f'{subdomain}.{domain}')
+        answers = resolver.resolve(f'{subdomain}.{domain}', 'A')
         for rdata in answers:
             return rdata.address
         return None
     except dns.resolver.NXDOMAIN:
-        print(f"Error: The domain {subdomain}.{domain} does not exist.")
-        sys.exit(1)
+        # The domain does not exist
+        return None
+    except dns.resolver.NoAnswer:
+        # The DNS response does not contain an answer to the question
+        return None
     except dns.resolver.Timeout:
         print("Error: Timeout while resolving the domain.")
         sys.exit(1)
@@ -133,7 +136,7 @@ def update_dns_record(api_token, zone_id, domain, subdomain, current_ip):
         "Content-Type": "application/json",
     }
 
-    params = {"name": f"{subdomain}.{domain}"}
+    params = {"name": f"{subdomain}.{domain}", "type": "A"}
     response = requests.get(url, headers=headers, params=params)
     if response.status_code != 200:
         print(f"Failed to fetch DNS record for {subdomain}.{domain}: {response.json()}")
@@ -217,7 +220,11 @@ def main():
             existing_ip = get_existing_ip(domain, subdomain, dns_server)
             if args.verbose:
                 print(f"Existing IP for {subdomain}.{domain}: {existing_ip}")
-            if current_ip != existing_ip:
+            if existing_ip is None:
+                if not args.silent:
+                    print(f"No existing DNS record for {subdomain}.{domain}. Creating one.")
+                create_dns_record(api_token, zone_id, domain, subdomain, current_ip)
+            elif current_ip != existing_ip:
                 if not args.silent:
                     print(f"Updating DNS record for {subdomain}.{domain} to {current_ip}")
                 update_dns_record(api_token, zone_id, domain, subdomain, current_ip)

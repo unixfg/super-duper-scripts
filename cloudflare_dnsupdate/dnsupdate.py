@@ -69,6 +69,15 @@ def get_config_params(config_file):
                 sys.exit(1)
     return api_token, dns_server, ip_service_url, domains
 
+def get_full_domain_name(domain, subdomain):
+    """
+    Returns the full domain name, handling the case where subdomain is '@'.
+    """
+    if subdomain == '@':
+        return domain
+    else:
+        return f"{subdomain}.{domain}"
+
 def get_current_ip(ip_service_url):
     """
     Get the current public IP address.
@@ -100,9 +109,10 @@ def get_existing_ip(domain, subdomain, dns_server):
     str containing the existing IP address of the subdomain, or None if it doesn't exist
     """
     try:
+        full_domain = get_full_domain_name(domain, subdomain)
         resolver = dns.resolver.Resolver()
         resolver.nameservers = [dns_server]
-        answers = resolver.resolve(f'{subdomain}.{domain}', 'A')
+        answers = resolver.resolve(full_domain, 'A')
         for rdata in answers:
             return rdata.address
         return None
@@ -130,21 +140,23 @@ def update_dns_record(api_token, zone_id, domain, subdomain, current_ip):
     subdomain: str containing the subdomain
     current_ip: str containing the current public IP address
     """
+    record_name = get_full_domain_name(domain, subdomain)
+
     url = f"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records"
     headers = {
         "Authorization": f"Bearer {api_token}",
         "Content-Type": "application/json",
     }
 
-    params = {"name": f"{subdomain}.{domain}", "type": "A"}
+    params = {"name": record_name, "type": "A"}
     response = requests.get(url, headers=headers, params=params)
     if response.status_code != 200:
-        print(f"Failed to fetch DNS record for {subdomain}.{domain}: {response.json()}")
+        print(f"Failed to fetch DNS record for {record_name}: {response.json()}")
         return
 
     dns_records = response.json()["result"]
     if not dns_records:
-        print(f"No DNS record found for {subdomain}.{domain}. Creating a new one.")
+        print(f"No DNS record found for {record_name}. Creating a new one.")
         create_dns_record(api_token, zone_id, domain, subdomain, current_ip)
         return
 
@@ -154,16 +166,16 @@ def update_dns_record(api_token, zone_id, domain, subdomain, current_ip):
     update_url = f"{url}/{record_id}"
     payload = {
         "type": "A",
-        "name": f"{subdomain}.{domain}",
+        "name": record_name,
         "content": current_ip,
         "ttl": 1,
         "proxied": False
     }
     response = requests.put(update_url, headers=headers, json=payload)
     if response.status_code != 200:
-        print(f"Failed to update DNS record for {subdomain}.{domain}: {response.json()}")
+        print(f"Failed to update DNS record for {record_name}: {response.json()}")
     else:
-        print(f"Successfully updated DNS record for {subdomain}.{domain}.")
+        print(f"Successfully updated DNS record for {record_name}.")
 
 def create_dns_record(api_token, zone_id, domain, subdomain, current_ip):
     """
@@ -176,6 +188,8 @@ def create_dns_record(api_token, zone_id, domain, subdomain, current_ip):
     subdomain: str containing the subdomain
     current_ip: str containing the current public IP address
     """
+    record_name = get_full_domain_name(domain, subdomain)
+
     url = f"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records"
     headers = {
         "Authorization": f"Bearer {api_token}",
@@ -183,16 +197,16 @@ def create_dns_record(api_token, zone_id, domain, subdomain, current_ip):
     }
     payload = {
         "type": "A",
-        "name": f"{subdomain}.{domain}",
+        "name": record_name,
         "content": current_ip,
         "ttl": 1,
         "proxied": False
     }
     response = requests.post(url, headers=headers, json=payload)
     if response.status_code != 200:
-        print(f"Failed to create DNS record for {subdomain}.{domain}: {response.json()}")
+        print(f"Failed to create DNS record for {record_name}: {response.json()}")
     else:
-        print(f"Successfully created DNS record for {subdomain}.{domain}.")
+        print(f"Successfully created DNS record for {record_name}.")
 
 def main():
     args, api_token, dns_server, ip_service_url, domains = setup()
@@ -217,20 +231,21 @@ def main():
         for subdomain in subdomains:
             if args.verbose:
                 print(f"Processing subdomain: {subdomain}")
+            full_domain_name = get_full_domain_name(domain, subdomain)
             existing_ip = get_existing_ip(domain, subdomain, dns_server)
             if args.verbose:
-                print(f"Existing IP for {subdomain}.{domain}: {existing_ip}")
+                print(f"Existing IP for {full_domain_name}: {existing_ip}")
             if existing_ip is None:
                 if not args.silent:
-                    print(f"No existing DNS record for {subdomain}.{domain}. Creating one.")
+                    print(f"No existing DNS record for {full_domain_name}. Creating one.")
                 create_dns_record(api_token, zone_id, domain, subdomain, current_ip)
             elif current_ip != existing_ip:
                 if not args.silent:
-                    print(f"Updating DNS record for {subdomain}.{domain} to {current_ip}")
+                    print(f"Updating DNS record for {full_domain_name} to {current_ip}")
                 update_dns_record(api_token, zone_id, domain, subdomain, current_ip)
             else:
                 if not args.silent:
-                    print(f"DNS record for {subdomain}.{domain} is up to date.")
+                    print(f"DNS record for {full_domain_name} is up to date.")
 
 if __name__ == "__main__":
     main()

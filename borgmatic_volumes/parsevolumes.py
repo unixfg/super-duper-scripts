@@ -15,8 +15,8 @@ def parse_arguments():
     )
     parser.add_argument(
         '-o', '--output',
-        default='volumes-compose.yml',
-        help='Output file name for the generated Docker Compose file (default: volumes-compose.yml).'
+        default='docker-compose.override.yml',
+        help='Output file name for the generated Docker Compose file (default: docker-compose.override.yml).'
     )
     parser.add_argument(
         '-s', '--service',
